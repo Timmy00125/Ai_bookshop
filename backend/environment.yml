@@ -11,7 +11,7 @@ dependencies:
   - psycopg2
   - pydantic
   - passlib
-  - bcrypt
+  - bcrypt=4.0.1
   - sentence-transformers
   - httpx
   - pytest
