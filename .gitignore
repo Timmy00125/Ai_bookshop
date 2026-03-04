@@ -4,3 +4,4 @@ backend/src/__pycache__/*
 backend/alembic/__pycache__/*
 backend/src/utils/__pycache__/*
 backend/src/services/*
+backend/tests/__pycache__/*
