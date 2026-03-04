@@ -1,5 +1,5 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
@@ -77,12 +77,17 @@ def update_cart_item(
     return item
 
 
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    response_model=None,
+)
 def remove_from_cart(
     item_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
-) -> Any:
+) -> Response:
     item = (
         db.query(models.CartItem)
         .filter(
@@ -95,3 +100,5 @@ def remove_from_cart(
 
     db.delete(item)
     db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

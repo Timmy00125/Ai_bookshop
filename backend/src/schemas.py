@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, condecimal
 
 from .models import OrderStatus, UserRole
 
@@ -32,7 +32,7 @@ class UserRead(UserBase):
 class BookBase(BaseModel):
     title: str
     author: str
-    price: Decimal = Field(gt=0, decimal_places=2)
+    price: condecimal(gt=0, decimal_places=2)
     description: Optional[str] = None
     genre: Optional[str] = None
     isbn: Optional[str] = None
@@ -49,7 +49,7 @@ class BookCreate(BookBase):
 class BookUpdate(BaseModel):
     title: Optional[str] = None
     author: Optional[str] = None
-    price: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
+    price: Optional[condecimal(gt=0, decimal_places=2)] = None
     description: Optional[str] = None
     genre: Optional[str] = None
     isbn: Optional[str] = None

@@ -1,6 +1,6 @@
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import asc, desc, or_
 from sqlalchemy.orm import Session
 
@@ -95,15 +95,22 @@ def update_book(
     return book
 
 
-@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{book_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    response_model=None,
+)
 def delete_book(
     book_id: int,
     db: Session = Depends(get_db),
     current_admin: models.User = Depends(get_current_admin_user),
-) -> Any:
+) -> Response:
     book = db.query(models.Book).filter(models.Book.id == book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
     db.delete(book)
     db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

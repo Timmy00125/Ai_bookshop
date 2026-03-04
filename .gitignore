@@ -3,3 +3,4 @@ backend/alembic/versions/__pycache__/*
 backend/src/__pycache__/*
 backend/alembic/__pycache__/*
 backend/src/utils/__pycache__/*
+backend/src/services/*
