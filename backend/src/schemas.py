@@ -1,16 +1,21 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
-from .models import UserRole, OrderStatus, HistoryEventType
+from typing import List, Optional
+
+from pydantic import BaseModel, EmailStr, Field
+
+from .models import OrderStatus, UserRole
+
 
 # --- User Schemas ---
 class UserBase(BaseModel):
     username: str
     email: EmailStr
 
+
 class UserCreate(UserBase):
     password: str
+
 
 class UserRead(UserBase):
     id: int
@@ -21,6 +26,7 @@ class UserRead(UserBase):
 
     class Config:
         from_attributes = True
+
 
 # --- Book Schemas ---
 class BookBase(BaseModel):
@@ -35,8 +41,10 @@ class BookBase(BaseModel):
     cover_image_url: Optional[str] = None
     stock_count: Optional[int] = 0
 
+
 class BookCreate(BookBase):
     pass
+
 
 class BookUpdate(BaseModel):
     title: Optional[str] = None
@@ -49,6 +57,7 @@ class BookUpdate(BaseModel):
     stock_count: Optional[int] = None
     cover_image_url: Optional[str] = None
 
+
 class BookRead(BookBase):
     id: int
     average_rating: Decimal
@@ -58,13 +67,16 @@ class BookRead(BookBase):
     class Config:
         from_attributes = True
 
+
 # --- Cart Schemas ---
 class CartItemCreate(BaseModel):
     book_id: int
     quantity: int = Field(default=1, gt=0)
 
+
 class CartItemUpdate(BaseModel):
     quantity: int = Field(gt=0)
+
 
 class CartItemRead(BaseModel):
     id: int
@@ -76,6 +88,7 @@ class CartItemRead(BaseModel):
     class Config:
         from_attributes = True
 
+
 # --- Order Schemas ---
 class OrderItemRead(BaseModel):
     id: int
@@ -86,6 +99,7 @@ class OrderItemRead(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class OrderRead(BaseModel):
     id: int

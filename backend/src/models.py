@@ -1,23 +1,39 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, DECIMAL, Enum, Text
-from sqlalchemy.orm import relationship
+
 from pgvector.sqlalchemy import Vector
+from sqlalchemy import (
+    DECIMAL,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy.orm import relationship
+
 from .database import Base
+
 
 class UserRole(str, enum.Enum):
     user = "user"
     admin = "admin"
+
 
 class OrderStatus(str, enum.Enum):
     pending = "pending"
     completed = "completed"
     cancelled = "cancelled"
 
+
 class HistoryEventType(str, enum.Enum):
     view = "view"
     cart_add = "cart_add"
     purchase = "purchase"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -29,11 +45,16 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.user, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     orders = relationship("Order", back_populates="user")
     cart_items = relationship("CartItem", back_populates="user")
     browsing_history = relationship("UserBrowsingHistory", back_populates="user")
+
 
 class Book(Base):
     __tablename__ = "books"
@@ -51,23 +72,31 @@ class Book(Base):
     stock_count = Column(Integer, default=0)
     average_rating = Column(DECIMAL(3, 2), default=0.0)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     embeddings = relationship("BookEmbedding", back_populates="book")
     order_items = relationship("OrderItem", back_populates="book")
     cart_items = relationship("CartItem", back_populates="book")
     browsing_history = relationship("UserBrowsingHistory", back_populates="book")
 
+
 class BookEmbedding(Base):
     __tablename__ = "book_embeddings"
 
     id = Column(Integer, primary_key=True, index=True)
     book_id = Column(Integer, ForeignKey("books.id"), nullable=False, unique=True)
-    embedding = Column(Vector(384)) # Default for all-MiniLM-L6-v2 which is standard for sentence-transformers
+    embedding = Column(
+        Vector(384)
+    )  # Default for all-MiniLM-L6-v2 which is standard for sentence-transformers
     model_version = Column(String)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     book = relationship("Book", back_populates="embeddings")
+
 
 class Order(Base):
     __tablename__ = "orders"
@@ -77,10 +106,15 @@ class Order(Base):
     total_price = Column(DECIMAL(10, 2), nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.pending, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     user = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
+
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -94,6 +128,7 @@ class OrderItem(Base):
     order = relationship("Order", back_populates="items")
     book = relationship("Book", back_populates="order_items")
 
+
 class CartItem(Base):
     __tablename__ = "cart_items"
 
@@ -105,6 +140,7 @@ class CartItem(Base):
 
     user = relationship("User", back_populates="cart_items")
     book = relationship("Book", back_populates="cart_items")
+
 
 class UserBrowsingHistory(Base):
     __tablename__ = "user_browsing_history"
