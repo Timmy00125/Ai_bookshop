@@ -80,3 +80,24 @@ def get_all_orders_admin(
     current_admin: models.User = Depends(get_current_admin_user),
 ) -> Any:
     return db.query(models.Order).order_by(models.Order.created_at.desc()).all()
+
+
+from pydantic import BaseModel
+
+class OrderStatusUpdate(BaseModel):
+    status: models.OrderStatus
+
+@router.patch("/{order_id}/status", response_model=schemas.OrderRead)
+def update_order_status(
+    order_id: int,
+    status_in: OrderStatusUpdate,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(get_current_admin_user),
+) -> Any:
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    order.status = status_in.status
+    db.commit()
+    db.refresh(order)
+    return order
