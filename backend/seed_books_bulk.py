@@ -4,9 +4,10 @@ Fetches real books from the Open Library API so that cover images
 match the actual book titles and authors.
 Uses batch inserts and batched embedding generation for performance.
 """
-import sys
+
 import os
 import random
+import sys
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -15,48 +16,114 @@ import httpx
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from sqlalchemy.orm import Session
 from sqlalchemy import text
-from src.database import SessionLocal, engine
+from sqlalchemy.orm import Session
 from src import models
-from src.services.ai_service import get_model, get_embedding
+from src.database import SessionLocal, engine
+from src.services.ai_service import get_embedding, get_model
 
 OPEN_LIBRARY_SEARCH = "https://openlibrary.org/search.json"
 OPEN_LIBRARY_COVERS = "https://covers.openlibrary.org/b"
 
 # Search queries to fetch a diverse set of real books
 SEARCH_QUERIES = [
-    "fiction bestseller", "mystery novel", "science fiction", "fantasy adventure",
-    "romance novel", "thriller suspense", "horror novel", "historical fiction",
-    "literary fiction", "classic literature", "detective story", "adventure novel",
-    "dystopian fiction", "war novel", "philosophical fiction", "psychological thriller",
-    "crime fiction", "dark fantasy", "epic fantasy", "space opera",
-    "young adult fiction", "children literature", "fairy tales", "mythology",
-    "poetry collection", "drama play", "biography memoir", "autobiography",
-    "history book", "world history", "ancient history", "military history",
-    "science popular", "physics book", "mathematics book", "biology book",
-    "chemistry book", "astronomy book", "computer science", "programming book",
-    "machine learning", "artificial intelligence", "data science", "web development",
-    "software engineering", "philosophy book", "psychology book", "sociology book",
-    "economics book", "political science", "business book", "leadership",
-    "self-help book", "personal development", "mindfulness meditation", "health fitness",
-    "nutrition diet", "cooking recipe", "travel guide", "art photography",
-    "music theory", "sports biography", "nature ecology", "climate change",
-    "space exploration", "quantum mechanics", "evolution biology", "neuroscience",
-    "entrepreneurship", "investing finance", "marketing strategy", "design thinking",
-    "creativity innovation", "stoicism philosophy", "existentialism", "eastern philosophy",
-    "religious studies", "cultural studies", "anthropology book", "archaeology book",
-    "linguistics book", "education pedagogy", "environmental science", "renewable energy",
+    "fiction bestseller",
+    "mystery novel",
+    "science fiction",
+    "fantasy adventure",
+    "romance novel",
+    "thriller suspense",
+    "horror novel",
+    "historical fiction",
+    "literary fiction",
+    "classic literature",
+    "detective story",
+    "adventure novel",
+    "dystopian fiction",
+    "war novel",
+    "philosophical fiction",
+    "psychological thriller",
+    "crime fiction",
+    "dark fantasy",
+    "epic fantasy",
+    "space opera",
+    "young adult fiction",
+    "children literature",
+    "fairy tales",
+    "mythology",
+    "poetry collection",
+    "drama play",
+    "biography memoir",
+    "autobiography",
+    "history book",
+    "world history",
+    "ancient history",
+    "military history",
+    "science popular",
+    "physics book",
+    "mathematics book",
+    "biology book",
+    "chemistry book",
+    "astronomy book",
+    "computer science",
+    "programming book",
+    "machine learning",
+    "artificial intelligence",
+    "data science",
+    "web development",
+    "software engineering",
+    "philosophy book",
+    "psychology book",
+    "sociology book",
+    "economics book",
+    "political science",
+    "business book",
+    "leadership",
+    "self-help book",
+    "personal development",
+    "mindfulness meditation",
+    "health fitness",
+    "nutrition diet",
+    "cooking recipe",
+    "travel guide",
+    "art photography",
+    "music theory",
+    "sports biography",
+    "nature ecology",
+    "climate change",
+    "space exploration",
+    "quantum mechanics",
+    "evolution biology",
+    "neuroscience",
+    "entrepreneurship",
+    "investing finance",
+    "marketing strategy",
+    "design thinking",
+    "creativity innovation",
+    "stoicism philosophy",
+    "existentialism",
+    "eastern philosophy",
+    "religious studies",
+    "cultural studies",
+    "anthropology book",
+    "archaeology book",
+    "linguistics book",
+    "education pedagogy",
+    "environmental science",
+    "renewable energy",
 ]
 
 
-def fetch_books_from_openlibrary(query: str, limit: int = 100, offset: int = 0) -> list[dict]:
-    """Fetch real books from Open Library search API."""
+def fetch_books_from_openlibrary(
+    query: str, limit: int = 100, offset: int = 0
+) -> list[dict]:
+    """Fetch real books from Open Library search API. Sorted by editions to get popular books."""
     try:
         params = {
             "q": query,
             "limit": limit,
             "offset": offset,
+            "sort": "editions",
             "fields": "key,title,author_name,first_publish_year,publisher,subject,cover_i,isbn,number_of_pages_median",
         }
         with httpx.Client(timeout=30) as client:
@@ -84,7 +151,13 @@ def map_subject_to_genre(subjects: list[str] | None) -> str:
     subject_text = " ".join(subjects).lower()
 
     genre_keywords = {
-        "Science Fiction": ["science fiction", "sci-fi", "space", "dystopia", "cyberpunk"],
+        "Science Fiction": [
+            "science fiction",
+            "sci-fi",
+            "space",
+            "dystopia",
+            "cyberpunk",
+        ],
         "Fantasy": ["fantasy", "magic", "dragon", "sword", "sorcery", "fairy"],
         "Mystery": ["mystery", "detective", "crime", "whodunit", "noir"],
         "Thriller": ["thriller", "suspense", "espionage", "spy"],
@@ -93,9 +166,29 @@ def map_subject_to_genre(subjects: list[str] | None) -> str:
         "Biography": ["biography", "memoir", "autobiography", "life story"],
         "History": ["history", "historical", "war", "civilization", "ancient"],
         "Self-Help": ["self-help", "personal development", "motivation", "mindfulness"],
-        "Business": ["business", "management", "leadership", "entrepreneurship", "marketing"],
-        "Technology": ["computer", "programming", "software", "technology", "internet", "web"],
-        "Science": ["science", "physics", "chemistry", "biology", "mathematics", "astronomy"],
+        "Business": [
+            "business",
+            "management",
+            "leadership",
+            "entrepreneurship",
+            "marketing",
+        ],
+        "Technology": [
+            "computer",
+            "programming",
+            "software",
+            "technology",
+            "internet",
+            "web",
+        ],
+        "Science": [
+            "science",
+            "physics",
+            "chemistry",
+            "biology",
+            "mathematics",
+            "astronomy",
+        ],
         "Philosophy": ["philosophy", "ethics", "metaphysics", "logic", "stoicism"],
         "Psychology": ["psychology", "psychotherapy", "mental health", "cognitive"],
         "Poetry": ["poetry", "poems", "verse", "sonnet"],
@@ -115,8 +208,16 @@ def map_subject_to_genre(subjects: list[str] | None) -> str:
 
     # Check for fiction vs non-fiction indicators
     non_fiction_indicators = [
-        "non-fiction", "nonfiction", "textbook", "manual", "handbook",
-        "guide", "reference", "study", "academic", "scholarly",
+        "non-fiction",
+        "nonfiction",
+        "textbook",
+        "manual",
+        "handbook",
+        "guide",
+        "reference",
+        "study",
+        "academic",
+        "scholarly",
     ]
     for indicator in non_fiction_indicators:
         if indicator in subject_text:
@@ -192,7 +293,9 @@ def fetch_all_books(target: int = 1200) -> list[dict]:
         if len(all_books) >= target:
             break
 
-        print(f"  [{i+1}/{len(queries)}] Fetching books for '{query}' (have {len(all_books)}/{target})...")
+        print(
+            f"  [{i + 1}/{len(queries)}] Fetching books for '{query}' (have {len(all_books)}/{target})..."
+        )
 
         # Fetch up to 2 pages per query for diversity
         for page in range(2):
@@ -224,12 +327,31 @@ def fetch_all_books(target: int = 1200) -> list[dict]:
     return all_books
 
 
-def seed_bulk(num_books=1000, batch_size=100):
+def clear_all_books():
+    """Removes all existing books and embeddings from the database."""
+    db: Session = SessionLocal()
+    try:
+        print("Clearing all existing books and embeddings from the database...")
+        db.query(models.BookEmbedding).delete()
+        db.query(models.Book).delete()
+        db.commit()
+        print("Database cleared successfully.")
+    except Exception as e:
+        db.rollback()
+        print(f"Error clearing database: {e}")
+    finally:
+        db.close()
+
+
+def seed_bulk(num_books=1000, batch_size=100, clear_first=False):
     """
     Seed books in batches for performance.
     Fetches real books from Open Library so covers match the actual books.
     Generates embeddings in batches using the sentence transformer's batch encoding.
     """
+    if clear_first:
+        clear_all_books()
+
     db: Session = SessionLocal()
     try:
         existing = db.query(models.Book).count()
@@ -237,11 +359,15 @@ def seed_bulk(num_books=1000, batch_size=100):
 
         remaining = num_books - existing
         if remaining <= 0:
-            print(f"Database already has {existing} books (target: {num_books}). Skipping seed.")
+            print(
+                f"Database already has {existing} books (target: {num_books}). Skipping seed."
+            )
             return
 
         print(f"Fetching {remaining} real books from Open Library API...")
-        all_books_data = fetch_all_books(target=remaining + 200)  # Fetch extra to account for skips
+        all_books_data = fetch_all_books(
+            target=remaining + 200
+        )  # Fetch extra to account for skips
 
         # Trim to exact count needed
         all_books_data = all_books_data[:remaining]
@@ -260,7 +386,9 @@ def seed_bulk(num_books=1000, batch_size=100):
             db.bulk_save_objects(books, return_defaults=True)
             db.commit()
 
-            print(f"  Inserted books {existing + batch_start + 1}-{existing + batch_end}")
+            print(
+                f"  Inserted books {existing + batch_start + 1}-{existing + batch_end}"
+            )
 
         print("Generating embeddings in batches...")
         model = get_model()
@@ -294,7 +422,9 @@ def seed_bulk(num_books=1000, batch_size=100):
             db.bulk_save_objects(embeddings)
             db.commit()
 
-            print(f"  Generated embeddings for books {batch_start + 1}-{batch_end}/{total_books}")
+            print(
+                f"  Generated embeddings for books {batch_start + 1}-{batch_end}/{total_books}"
+            )
 
         print("Creating database indexes for performance...")
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_books_genre ON books(genre)"))
@@ -303,7 +433,9 @@ def seed_bulk(num_books=1000, batch_size=100):
         db.execute(text("CREATE INDEX IF NOT EXISTS idx_books_price ON books(price)"))
         db.commit()
 
-        print(f"\nSuccessfully seeded {len(all_books_data)} real books with matching covers!")
+        print(
+            f"\nSuccessfully seeded {len(all_books_data)} real books with matching covers!"
+        )
         print(f"Total books in database: {db.query(models.Book).count()}")
         print("Database indexes created for optimal query performance.")
 
@@ -335,7 +467,11 @@ def find_cover_for_title(title: str, author: str = "") -> str | None:
             if not cover_id:
                 continue
             # Accept if title is a close match
-            if doc_title in title_lower or title_lower in doc_title or len(set(title_lower.split()) & set(doc_title.split())) >= 2:
+            if (
+                doc_title in title_lower
+                or title_lower in doc_title
+                or len(set(title_lower.split()) & set(doc_title.split())) >= 2
+            ):
                 return f"{OPEN_LIBRARY_COVERS}/id/{cover_id}-L.jpg"
 
         # Fallback: use first result with a cover
@@ -364,7 +500,9 @@ def fix_existing_covers():
 
         for i, book in enumerate(books):
             if (i + 1) % 50 == 0:
-                print(f"  Progress: {i+1}/{len(books)} (updated: {updated}, skipped: {skipped})")
+                print(
+                    f"  Progress: {i + 1}/{len(books)} (updated: {updated}, skipped: {skipped})"
+                )
 
             # Check if current cover looks random (uses the old random ID pattern)
             current_url = book.cover_image_url or ""
@@ -394,6 +532,10 @@ if __name__ == "__main__":
     num = 1000
     if len(sys.argv) > 1 and sys.argv[1] == "fix-covers":
         fix_existing_covers()
+    elif len(sys.argv) > 1 and sys.argv[1] == "clear":
+        clear_all_books()
+    elif len(sys.argv) > 1 and sys.argv[1] == "reseed":
+        seed_bulk(num_books=num, clear_first=True)
     elif len(sys.argv) > 1:
         num = int(sys.argv[1])
         seed_bulk(num_books=num)
