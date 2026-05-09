@@ -11,7 +11,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (token: string) => void;
+  login: (token: string) => Promise<User>;
   logout: () => void;
   loading: boolean;
 }
@@ -37,9 +37,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   }, [token]);
 
-  const login = (newToken: string) => {
+  const login = async (newToken: string): Promise<User> => {
     localStorage.setItem('token', newToken);
     setToken(newToken);
+    const res = await api.get('/auth/me');
+    const fetchedUser: User = res.data;
+    setUser(fetchedUser);
+    return fetchedUser;
   };
 
   const logout = () => {

@@ -11,7 +11,16 @@ import Orders from './pages/Orders';
 import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>

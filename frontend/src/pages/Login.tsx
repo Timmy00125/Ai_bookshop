@@ -25,8 +25,8 @@ export default function Login() {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
-      login(res.data.access_token);
-      navigate('/');
+      const loggedInUser = await login(res.data.access_token);
+      navigate(loggedInUser.role === 'admin' ? '/admin' : '/');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Please try again.');
     } finally {
