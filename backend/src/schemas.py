@@ -34,7 +34,7 @@ class BookBase(BaseModel):
     author: str
     price: condecimal(gt=0, decimal_places=2)
     description: Optional[str] = None
-    genre: Optional[str] = None
+    genre: str
     isbn: Optional[str] = None
     publisher: Optional[str] = None
     publication_date: Optional[datetime] = None

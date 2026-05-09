@@ -62,7 +62,7 @@ class Book(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True, nullable=False)
     author = Column(String, index=True, nullable=False)
-    genre = Column(String, index=True)
+    genre = Column(String, index=True, nullable=False)
     description = Column(Text)
     isbn = Column(String, unique=True, index=True)
     publisher = Column(String)

@@ -4,6 +4,7 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { Search, Sparkles, Star, ShoppingCart } from 'lucide-react';
+import ReadingHistory from '../components/ReadingHistory';
 
 export default function Home() {
   const { user } = useAuth();
@@ -15,6 +16,10 @@ export default function Home() {
   const [searchMode, setSearchMode] = useState<'regular' | 'semantic'>('semantic');
   const [searching, setSearching] = useState(false);
 
+  // Genre-based search result state
+  const [matchedBook, setMatchedBook] = useState<any>(null);
+  const [similarBooks, setSimilarBooks] = useState<any[]>([]);
+
   useEffect(() => {
     fetchInitialData();
   }, [user]);
@@ -24,7 +29,7 @@ export default function Home() {
     try {
       const [booksRes, recsRes] = await Promise.all([
         api.get('/books/'),
-        api.get('/ai/recommendations')
+        user ? api.get('/ai/recommendations').catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
       ]);
       setBooks(booksRes.data);
       setRecommendations(recsRes.data);
@@ -35,20 +40,37 @@ export default function Home() {
     }
   };
 
+  const clearSearch = () => {
+    setMatchedBook(null);
+    setSimilarBooks([]);
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) {
+      clearSearch();
       fetchInitialData();
       return;
     }
     setSearching(true);
     try {
       if (searchMode === 'semantic') {
+        clearSearch();
         const res = await api.get(`/ai/search`, { params: { query, limit: 12 } });
         setBooks(res.data);
       } else {
-        const res = await api.get(`/books/`, { params: { search: query } });
-        setBooks(res.data);
+        // Try genre-based recommendation search first
+        try {
+          const res = await api.get('/books/search-with-recommendations', { params: { query } });
+          setMatchedBook(res.data.matched_book);
+          setSimilarBooks(res.data.similar_books);
+          setBooks([]);
+        } catch {
+          // Fallback to regular search if no exact title match
+          clearSearch();
+          const res = await api.get(`/books/`, { params: { search: query } });
+          setBooks(res.data);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -142,6 +164,9 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Reading History Section */}
+      {!query && <ReadingHistory />}
+
       {/* Recommendations Section */}
       {!query && recommendations.length > 0 && (
         <div className="mb-16">
@@ -157,30 +182,95 @@ export default function Home() {
         </div>
       )}
 
-      {/* Catalog Section */}
+      {/* Genre-Based Search Results */}
+      {matchedBook && (
+        <div className="mb-16">
+          {/* Primary matched book */}
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+            <Search size={24} className="text-indigo-500" /> Search Result
+          </h2>
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 mb-10 flex flex-col sm:flex-row gap-6">
+            <div className="w-full sm:w-48 h-64 rounded-2xl overflow-hidden bg-slate-200 flex-shrink-0">
+              {matchedBook.cover_image_url ? (
+                <img src={matchedBook.cover_image_url} alt={matchedBook.title} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-400">No Cover</div>
+              )}
+            </div>
+            <div className="flex flex-col flex-grow">
+              <div className="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">{matchedBook.genre}</div>
+              <Link to={`/book/${matchedBook.id}`} className="text-2xl font-extrabold text-slate-900 hover:text-indigo-600 transition mb-2">
+                {matchedBook.title}
+              </Link>
+              <div className="text-slate-500 mb-2">{matchedBook.author}</div>
+              <div className="flex items-center gap-1 mb-3">
+                <Star size={16} className="text-amber-500 fill-amber-500" />
+                <span className="font-bold text-slate-700">{matchedBook.average_rating}</span>
+              </div>
+              {matchedBook.description && (
+                <p className="text-slate-600 text-sm line-clamp-3 mb-4">{matchedBook.description}</p>
+              )}
+              <div className="mt-auto flex items-center gap-4">
+                <span className="font-extrabold text-2xl text-slate-900">${Number(matchedBook.price).toFixed(2)}</span>
+                <button
+                  onClick={() => addToCart(matchedBook.id, 1)}
+                  className="bg-indigo-600 text-white font-bold py-2.5 px-6 rounded-xl hover:bg-indigo-700 transition active:scale-95"
+                >
+                  Add to Cart
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Similar books by genre */}
+          {similarBooks.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <Sparkles className="text-amber-500" size={24} />
+                <h3 className="text-xl font-extrabold text-slate-900">
+                  Similar Books in {matchedBook.genre}
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                {similarBooks.map((book: any) => (
+                  <BookCard key={book.id} book={book} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Catalog / Generic Search Results */}
       <div>
         <h2 className="text-2xl font-extrabold text-slate-900 mb-6 flex items-center gap-2">
-          {query ? (
+          {query && !matchedBook ? (
              <>{searchMode === 'semantic' ? <Sparkles size={24} className="text-indigo-500" /> : <Search size={24} className="text-indigo-500" />} Search Results</>
-          ) : (
+          ) : !matchedBook ? (
              "All Books"
-          )}
+          ) : null}
         </h2>
         
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          </div>
-        ) : books.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {books.map(book => (
-              <BookCard key={book.id} book={book} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
-            <p className="text-slate-500 text-lg">No books found matching your criteria.</p>
-          </div>
+        {!matchedBook && (
+          loading ? (
+            <div className="flex justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : books.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {books.map(book => (
+                <BookCard key={book.id} book={book} />
+              ))}
+            </div>
+          ) : query ? (
+            <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
+              <p className="text-slate-500 text-lg">No books found matching your criteria.</p>
+            </div>
+          ) : (
+            <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
+              <p className="text-slate-500 text-lg">No books in catalog yet.</p>
+            </div>
+          )
         )}
       </div>
     </div>

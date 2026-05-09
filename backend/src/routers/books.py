@@ -1,6 +1,7 @@
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import BaseModel
 from sqlalchemy import asc, desc, or_
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,11 @@ from ..database import get_db
 from ..utils.dependencies import get_current_admin_user
 
 router = APIRouter(prefix="/books", tags=["books"])
+
+
+class SearchWithRecommendationsResponse(BaseModel):
+    matched_book: schemas.BookRead
+    similar_books: List[schemas.BookRead]
 
 
 @router.get("/", response_model=List[schemas.BookRead])
@@ -52,6 +58,34 @@ def get_books(
         query = query.order_by(desc(models.Book.created_at))
 
     return query.offset(skip).limit(limit).all()
+
+
+@router.get("/search-with-recommendations", response_model=SearchWithRecommendationsResponse)
+def search_with_recommendations(
+    query: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+) -> Any:
+    search_filter = f"%{query}%"
+    matched = (
+        db.query(models.Book)
+        .filter(models.Book.title.ilike(search_filter))
+        .first()
+    )
+    if not matched:
+        raise HTTPException(status_code=404, detail="No book found matching that title")
+
+    similar = (
+        db.query(models.Book)
+        .filter(models.Book.genre == matched.genre, models.Book.id != matched.id)
+        .order_by(models.Book.average_rating.desc())
+        .limit(6)
+        .all()
+    )
+
+    return SearchWithRecommendationsResponse(
+        matched_book=matched,
+        similar_books=similar,
+    )
 
 
 @router.get("/{book_id}", response_model=schemas.BookRead)
