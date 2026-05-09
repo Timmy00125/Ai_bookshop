@@ -3,6 +3,7 @@ import api from '../api';
 import {
   Shield, BookOpen, Plus, Trash2, RefreshCw, ShoppingBag, Package,
   CheckCircle, Users, Pencil, X, BarChart3, TrendingUp, UserCheck,
+  Filter,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -26,6 +27,14 @@ interface UserRecord {
   created_at: string;
 }
 
+const KNOWN_GENRES = [
+  "Fiction", "Non-Fiction", "Mystery", "Thriller", "Romance", "Science Fiction",
+  "Fantasy", "Horror", "Biography", "History", "Self-Help", "Business",
+  "Technology", "Science", "Philosophy", "Psychology", "Poetry", "Drama",
+  "Travel", "Cooking", "Health", "Art", "Music", "Sports", "Education",
+  "Children", "Young Adult", "Crime", "Adventure", "Western",
+];
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [books, setBooks] = useState<any[]>([]);
@@ -36,6 +45,8 @@ export default function AdminDashboard() {
   const [addingBook, setAddingBook] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [activeTab, setActiveTab] = useState<'books' | 'orders' | 'users'>('books');
+  const [genres, setGenres] = useState<string[]>([]);
+  const [selectedGenre, setSelectedGenre] = useState<string>('');
 
   // New/edit book state
   const [editingBook, setEditingBook] = useState<any>(null);
@@ -43,15 +54,28 @@ export default function AdminDashboard() {
   const [author, setAuthor] = useState('');
   const [price, setPrice] = useState('');
   const [genre, setGenre] = useState('');
+  const [customGenre, setCustomGenre] = useState('');
+  const [useCustomGenre, setUseCustomGenre] = useState(false);
   const [description, setDescription] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [isbn, setIsbn] = useState('');
   const [publisher, setPublisher] = useState('');
   const [stockCount, setStockCount] = useState('');
+  const [publicationDate, setPublicationDate] = useState('');
 
   useEffect(() => {
     fetchData();
+    fetchGenres();
   }, []);
+
+  const fetchGenres = async () => {
+    try {
+      const res = await api.get('/books/genres');
+      setGenres(res.data.genres);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -76,7 +100,8 @@ export default function AdminDashboard() {
   const resetForm = () => {
     setTitle(''); setAuthor(''); setPrice(''); setGenre('');
     setDescription(''); setCoverUrl(''); setIsbn(''); setPublisher('');
-    setStockCount(''); setEditingBook(null);
+    setStockCount(''); setPublicationDate(''); setEditingBook(null);
+    setCustomGenre(''); setUseCustomGenre(false);
   };
 
   const startEdit = (book: any) => {
@@ -90,17 +115,22 @@ export default function AdminDashboard() {
     setIsbn(book.isbn || '');
     setPublisher(book.publisher || '');
     setStockCount(String(book.stock_count || 0));
+    setPublicationDate(book.publication_date ? new Date(book.publication_date).toISOString().split('T')[0] : '');
   };
 
   const handleAddOrEditBook = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddingBook(true);
     try {
+      const finalGenre = useCustomGenre ? customGenre : genre;
       const payload: any = {
-        title, author, price: parseFloat(price), genre, description,
+        title, author, price: parseFloat(price), genre: finalGenre, description,
         cover_image_url: coverUrl, isbn: isbn || undefined,
         publisher: publisher || undefined, stock_count: parseInt(stockCount) || 0,
       };
+      if (publicationDate) {
+        payload.publication_date = new Date(publicationDate).toISOString();
+      }
 
       if (editingBook) {
         await api.put(`/books/${editingBook.id}`, payload);
@@ -109,6 +139,7 @@ export default function AdminDashboard() {
       }
       resetForm();
       await fetchData();
+      await fetchGenres();
     } catch (err) {
       console.error(err);
       alert(editingBook ? 'Failed to update book' : 'Failed to add book');
@@ -311,9 +342,28 @@ export default function AdminDashboard() {
                     <input required type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Genre</label>
-                    <input required type="text" value={genre} onChange={e => setGenre(e.target.value)} className="w-full px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition" />
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Stock</label>
+                    <input type="number" value={stockCount} onChange={e => setStockCount(e.target.value)} className="w-full px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition" />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Genre</label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="flex items-center gap-1 text-sm text-slate-600 cursor-pointer">
+                      <input type="checkbox" checked={useCustomGenre} onChange={e => setUseCustomGenre(e.target.checked)} className="accent-indigo-600" />
+                      Custom genre
+                    </label>
+                  </div>
+                  {useCustomGenre ? (
+                    <input required type="text" value={customGenre} onChange={e => setCustomGenre(e.target.value)} placeholder="Enter custom genre" className="w-full px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition" />
+                  ) : (
+                    <select required value={genre} onChange={e => setGenre(e.target.value)} className="w-full px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition">
+                      <option value="">Select genre</option>
+                      {KNOWN_GENRES.map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -321,8 +371,8 @@ export default function AdminDashboard() {
                     <input type="text" value={isbn} onChange={e => setIsbn(e.target.value)} className="w-full px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition" />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Stock</label>
-                    <input type="number" value={stockCount} onChange={e => setStockCount(e.target.value)} className="w-full px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition" />
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Pub. Date</label>
+                    <input type="date" value={publicationDate} onChange={e => setPublicationDate(e.target.value)} className="w-full px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition" />
                   </div>
                 </div>
                 <div>
@@ -353,9 +403,24 @@ export default function AdminDashboard() {
 
           <div className="lg:col-span-2">
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 overflow-hidden">
-              <h3 className="text-xl font-extrabold text-slate-900 mb-6 flex items-center gap-2">
-                <BookOpen size={24} className="text-indigo-600" /> Catalog Management
-              </h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                  <BookOpen size={24} className="text-indigo-600" /> Catalog Management
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Filter size={16} className="text-slate-400" />
+                  <select
+                    value={selectedGenre}
+                    onChange={e => setSelectedGenre(e.target.value)}
+                    className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none"
+                  >
+                    <option value="">All Genres</option>
+                    {genres.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -368,47 +433,51 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {books.map(book => (
-                      <tr key={book.id} className="border-b border-slate-50 hover:bg-slate-50 transition">
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-900">{book.title}</div>
-                          <div className="text-sm text-slate-500">{book.author}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">
-                            {book.genre}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center font-bold text-slate-700">
-                          ${Number(book.price).toFixed(2)}
-                        </td>
-                        <td className="py-3 px-4 text-center text-slate-600">
-                          {book.stock_count}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => startEdit(book)}
-                              className="text-slate-400 hover:text-indigo-500 p-2 rounded-lg hover:bg-indigo-50 transition"
-                              title="Edit Book"
-                            >
-                              <Pencil size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteBook(book.id)}
-                              className="text-slate-400 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition"
-                              title="Delete Book"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {books
+                      .filter(book => !selectedGenre || book.genre === selectedGenre)
+                      .map(book => (
+                        <tr key={book.id} className="border-b border-slate-50 hover:bg-slate-50 transition">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-900">{book.title}</div>
+                            <div className="text-sm text-slate-500">{book.author}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">
+                              {book.genre}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-bold text-slate-700">
+                            ${Number(book.price).toFixed(2)}
+                          </td>
+                          <td className="py-3 px-4 text-center text-slate-600">
+                            {book.stock_count}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => startEdit(book)}
+                                className="text-slate-400 hover:text-indigo-500 p-2 rounded-lg hover:bg-indigo-50 transition"
+                                title="Edit Book"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBook(book.id)}
+                                className="text-slate-400 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-50 transition"
+                                title="Delete Book"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
-                {books.length === 0 && (
-                  <div className="text-center py-10 text-slate-500">No books in catalog. Add your first one!</div>
+                {books.filter(book => !selectedGenre || book.genre === selectedGenre).length === 0 && (
+                  <div className="text-center py-10 text-slate-500">
+                    {selectedGenre ? `No books found in "${selectedGenre}" genre.` : 'No books in catalog. Add your first one!'}
+                  </div>
                 )}
               </div>
             </div>

@@ -3,18 +3,21 @@ import { Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { Search, Sparkles, Star, ShoppingCart } from 'lucide-react';
+import { Search, Sparkles, Star, ShoppingCart, Filter } from 'lucide-react';
 import ReadingHistory from '../components/ReadingHistory';
 
 export default function Home() {
   const { user } = useAuth();
   const { addToCart } = useCart();
   const [books, setBooks] = useState<any[]>([]);
+  const [allBooks, setAllBooks] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchMode, setSearchMode] = useState<'regular' | 'semantic'>('semantic');
   const [searching, setSearching] = useState(false);
+  const [genres, setGenres] = useState<string[]>([]);
+  const [selectedGenre, setSelectedGenre] = useState<string>('');
 
   // Genre-based search result state
   const [matchedBook, setMatchedBook] = useState<any>(null);
@@ -27,12 +30,15 @@ export default function Home() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [booksRes, recsRes] = await Promise.all([
-        api.get('/books/'),
-        user ? api.get('/ai/recommendations').catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
+      const [booksRes, recsRes, genresRes] = await Promise.all([
+        api.get('/books/', { params: { limit: 100 } }),
+        user ? api.get('/ai/recommendations').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+        api.get('/books/genres'),
       ]);
+      setAllBooks(booksRes.data);
       setBooks(booksRes.data);
       setRecommendations(recsRes.data);
+      setGenres(genresRes.data.genres);
     } catch (err) {
       console.error(err);
     } finally {
@@ -40,9 +46,18 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    if (selectedGenre) {
+      setBooks(allBooks.filter(book => book.genre === selectedGenre));
+    } else {
+      setBooks(allBooks);
+    }
+  }, [selectedGenre, allBooks]);
+
   const clearSearch = () => {
     setMatchedBook(null);
     setSimilarBooks([]);
+    setSelectedGenre('');
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -78,7 +93,6 @@ export default function Home() {
       setSearching(false);
     }
   };
-
   const BookCard = ({ book }: { book: any }) => (
     <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-slate-100 flex flex-col overflow-hidden group">
       <div className="h-64 bg-slate-200 w-full relative overflow-hidden">
@@ -243,13 +257,43 @@ export default function Home() {
 
       {/* Catalog / Generic Search Results */}
       <div>
-        <h2 className="text-2xl font-extrabold text-slate-900 mb-6 flex items-center gap-2">
-          {query && !matchedBook ? (
-             <>{searchMode === 'semantic' ? <Sparkles size={24} className="text-indigo-500" /> : <Search size={24} className="text-indigo-500" />} Search Results</>
-          ) : !matchedBook ? (
-             "All Books"
-          ) : null}
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
+            {query && !matchedBook ? (
+              <>{searchMode === 'semantic' ? <Sparkles size={24} className="text-indigo-500" /> : <Search size={24} className="text-indigo-500" />} Search Results</>
+            ) : !matchedBook ? (
+              "All Books"
+            ) : null}
+          </h2>
+          {!query && !matchedBook && genres.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
+              <Filter size={16} className="text-slate-400 flex-shrink-0" />
+              <button
+                onClick={() => setSelectedGenre('')}
+                className={`px-3 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition ${
+                  !selectedGenre
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All
+              </button>
+              {genres.map(genre => (
+                <button
+                  key={genre}
+                  onClick={() => setSelectedGenre(genre)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition ${
+                    selectedGenre === genre
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {genre}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         
         {!matchedBook && (
           loading ? (

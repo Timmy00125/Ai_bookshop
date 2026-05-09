@@ -2,11 +2,12 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
-from sqlalchemy import asc, desc, or_
+from sqlalchemy import asc, desc, or_, func, distinct
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import get_db
+from ..services.ai_service import generate_book_embedding
 from ..utils.dependencies import get_current_admin_user
 
 router = APIRouter(prefix="/books", tags=["books"])
@@ -15,6 +16,16 @@ router = APIRouter(prefix="/books", tags=["books"])
 class SearchWithRecommendationsResponse(BaseModel):
     matched_book: schemas.BookRead
     similar_books: List[schemas.BookRead]
+
+
+class GenresResponse(BaseModel):
+    genres: List[str]
+
+
+@router.get("/genres", response_model=GenresResponse)
+def get_genres(db: Session = Depends(get_db)) -> Any:
+    result = db.query(distinct(models.Book.genre)).order_by(models.Book.genre).all()
+    return {"genres": [row[0] for row in result]}
 
 
 @router.get("/", response_model=List[schemas.BookRead])
@@ -106,6 +117,7 @@ def create_book(
     db.add(book)
     db.commit()
     db.refresh(book)
+    generate_book_embedding(book, db)
     return book
 
 
