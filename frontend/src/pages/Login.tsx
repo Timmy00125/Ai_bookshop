@@ -20,15 +20,23 @@ export default function Login() {
       formData.append('username', username);
       formData.append('password', password);
       
+      console.log('Sending login request...');
       const res = await api.post('/auth/login', formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
+      console.log('Login response:', res.status, res.data);
+      
       const loggedInUser = await login(res.data.access_token);
+      console.log('Login success, user:', loggedInUser);
       navigate(loggedInUser.role === 'admin' ? '/admin' : '/');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Please try again.');
+      console.error('Login error:', err);
+      console.error('Error response:', err.response);
+      console.error('Error message:', err.message);
+      console.error('Error config:', err.config);
+      setError(err.response?.data?.detail || err.message || 'Login failed. Please try again.');
     } finally {
         setLoading(false);
     }
